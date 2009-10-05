@@ -33,11 +33,11 @@
                                     (else 0)))))
            (v (build-vector eq-count
                             (lambda (k)
-                              (let ((k (add1 k)))
+                              (let ((k (+ 2 k)))
                                 (+ (/ (initial k) time-step)
-                                   (cond ((= k 1)
+                                   (cond ((= k 2)
                                           (* r left-value))
-                                         ((= k eq-count)
+                                         ((= k (add1 eq-count))
                                           (* r right-value))
                                          (else 0))))))))
       (vector-append (vector left-value)
@@ -50,7 +50,7 @@
                             time-step space-step
                             until-time)
   (define (function-to-initial f)
-    (lambda (k) (f (* k space-step))))
+    (lambda (k) (f (* (sub1 k) space-step))))
   (define (iteration initial at-time acc)
     (if (< at-time until-time)
         (let* ((solution (solve-heat conductivity initial
@@ -62,7 +62,7 @@
           (iteration next-initial (+ at-time time-step)
                      (append acc (list (cons at-time solution)))))
         acc))
-  (iteration (function-to-initial initial) 0 '()))
+  (iteration (function-to-initial initial) time-step '()))
 
 (define (simple-print solutions space-step)
   (for-each
@@ -71,7 +71,7 @@
            (solution (cdr layer)))
        (vector-for-each
         (lambda (k value)
-          (display (format "~a ~a ~a~n" at-time k value)))
+          (display (format "~a ~a ~a~n" at-time (* space-step k) value)))
         solution))
      (newline))
    solutions))
