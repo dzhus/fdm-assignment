@@ -70,20 +70,21 @@
            (solution (cdr layer)))
        (vector-for-each
         (lambda (k value)
-          (display (format "~a ~a ~a~n" at-time (* space-step k) value)))
+          (display (format "~0,2F ~0,2F ~a~%" at-time (* space-step k) value)))
         solution))
      (newline))
    solutions))
 
-(simple-print (solve-heat-problem 0.02
-                                  (lambda (x)
-                                    (* 100 (sin (* pi x))))
-                                  (lambda (t) 0)
-                                  (lambda (t) 0)
-                                  1
-                                  0.1
-                                  (command-line
-                                   #:program "temp"
-                                   #:args (until)
-                                   (string->number until)))
+(simple-print (solve-heat-problem
+               0.02
+               (lambda (x)
+                 (* 100 (sin (* pi x))))
+               (lambda (t) 0)
+               (lambda (t) 0)
+               0.1
+               0.1
+               (command-line
+                #:program "temp"
+                #:args (until)
+                (string->number until)))
               0.1)
