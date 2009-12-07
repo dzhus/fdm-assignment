@@ -50,7 +50,7 @@
                             until-time)
   (define (function-to-initial f)
     (lambda (k) (f (* (sub1 k) space-step))))
-  (define (iteration initial at-time acc)
+  (define (iteration initial at-time [acc '#()])
     (if (< at-time until-time)
         (let* ((solution (solve-heat conductivity initial
                                      (left-bound at-time)
@@ -59,13 +59,13 @@
                (next-initial
                 (lambda (k) (vector-ref solution (sub1 k)))))
           (iteration next-initial (+ at-time time-step)
-                     (append acc (list (cons at-time solution)))))
+                     (vector-append acc (vector (cons at-time solution)))))
         acc))
-  (iteration (function-to-initial initial) time-step '()))
+  (iteration (function-to-initial initial) time-step))
 
 (define (simple-print solutions space-step)
-  (for-each
-   (lambda (layer)
+  (vector-for-each
+   (lambda (k layer)
      (let ((at-time (car layer))
            (solution (cdr layer)))
        (vector-for-each
@@ -75,16 +75,75 @@
      (newline))
    solutions))
 
-(simple-print (solve-heat-problem
-               0.02
-               (lambda (x)
-                 (* 100 (sin (* pi x))))
-               (lambda (t) 0)
-               (lambda (t) 0)
-               0.1
-               0.1
-               (command-line
-                #:program "temp"
-                #:args (until)
-                (string->number until)))
-              0.1)
+(define (meshviewer-print solutions space-step)
+  (let ((time-layers (vector-length solutions))
+        (space-layers (add1 (inexact->exact (/ space-step)))))
+    (define (node-index space-index time-index)
+      (+ (add1 space-index) (* time-index space-layers)))
+    ;; Return index for element with (node-index s-i t-i) in upper left corner
+    (define (element-index space-index time-index)
+      (+ (add1 space-index) (* time-index (sub1 space-layers))))
+
+    ;; Print solutions for every time layer, sequentially enumerating
+    ;; all nodes
+    (define (print-nodes solutions)
+      (vector-for-each
+       (lambda (time-index layer)
+         (let ((at-time (car layer))
+               (values (cdr layer)))
+           (vector-for-each
+            (lambda (space-index value)
+              (display (format "~d ~0,2F ~0,2F ~a~%"
+                               (node-index space-index time-index)
+                               at-time
+                               (* space-step space-index)
+                               value)))
+            values)))
+       solutions))
+    
+    (define (print-elements solutions)
+      (define (last-space-index? k)
+        (= k (sub1 space-layers)))
+      (define (last-time-index? k)
+        (= k (sub1 time-layers)))
+      (vector-for-each
+       (lambda (time-index layer)
+         (when (not (last-time-index? time-index))
+           (let ((at-time (car layer))
+                 (values (cdr layer)))
+             (vector-for-each
+              (lambda (space-index value)
+                (when (not (last-space-index? space-index))
+                  (let* ((n1 (node-index space-index time-index))
+                         (n2 (add1 n1))
+                         (n3 (node-index space-index (add1 time-index)))
+                         (n4 (add1 n3)))
+                    (display (format "~d ~d ~d ~d ~d~%"
+                                     (element-index space-index time-index)
+                                     n1 n2 n3 n4)))))
+                values))))
+       solutions))
+    
+    (display "# Nodes\n")
+    (let ((node-count (* time-layers space-layers)))
+      (display (format "~a ~a ~a ~a~%" node-count 2 1 "u")))
+    (print-nodes solutions)
+    (display "# Elements\n")
+    (let ((element-count (* (sub1 time-layers) (sub1 space-layers))))
+      (display (format "~a ~a ~a~%" element-count 4 0)))
+    (print-elements solutions)))
+
+(meshviewer-print
+ (solve-heat-problem
+  0.02
+  (lambda (x)
+    (* 100 (sin (* pi x))))
+  (lambda (t) 0)
+  (lambda (t) (* 10 (sin t)))
+  0.1
+  0.1
+  (command-line
+   #:program "temp"
+   #:args (until)
+   (string->number until)))
+ 0.1)
