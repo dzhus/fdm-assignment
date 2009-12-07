@@ -1,6 +1,7 @@
 #lang scheme
 
 (require srfi/43
+         srfi/48
          (planet wmfarr/simple-matrix:1:0/matrix)
          pyani-lib/matrix
          pyani-lib/linear-eq)
@@ -31,15 +32,10 @@
                                     ((= (abs (- k n)) 1)
                                      (- r))
                                     (else 0)))))
-           (v (build-vector eq-count
-                            (lambda (k)
-                              (let ((k (+ 2 k)))
-                                (+ (/ (initial k) time-step)
-                                   (cond ((= k 2)
-                                          (* r left-value))
-                                         ((= k (add1 eq-count))
-                                          (* r right-value))
-                                         (else 0))))))))
+           (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 2)) time-step)))
+                          (vector-append (vector left-value)
+                                         (make-vector (- eq-count 2) 0)
+                                         (vector right-value)))))
       (vector-append (vector left-value)
                      (solve-tridiagonal A v)
                      (vector right-value)))))
