@@ -40,6 +40,9 @@
                      (solve-tridiagonal A v)
                      (vector right-value)))))
 
+;; Generate a list of solutions for heat equation on every time layer.
+;; Return a list of pairs where car is time and cdr is a vector of
+;; temperature values along the interval.
 (define (solve-heat-problem conductivity
                             initial
                             left-bound right-bound
