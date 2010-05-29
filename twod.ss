@@ -41,7 +41,7 @@
                      (solve-tridiagonal A v)
                      (vector right-value)))))
 
-(define-struct grid-point (x y i j bound value))
+(define-struct grid-point (x y bound value))
 
 (define (distance x1 y1 x2 y2)
   (sqrt (+ (sqr (- x1 x2) ) (sqr (- y1 y2)))))
