@@ -66,6 +66,13 @@
                                            (initial x y))
                           #f))))))
 
+;; Set `value` field of point structure in grid to `new-point-value`
+(define (grid-value-update! grid i j new-point-value)
+  (matrix-set! grid i j
+               (struct-copy grid-point
+                            (matrix-ref grid i j)
+                            [value new-point-value])))
+
 (define (display-grid grid)
   (for/list ((p (in-matrix grid)))
             (when p
@@ -74,12 +81,6 @@
                                (grid-point-y p)
                                (or (grid-point-value p) 0)))))
   (void))
-
-(define (grid-value-update! grid i j new-point-value)
-  (matrix-set! grid i j
-               (struct-copy grid-point
-                            (matrix-ref grid i j)
-                            [value new-point-value])))
 
 (define (dump-grid-to-file grid filename)
   (with-output-to-file filename
@@ -96,11 +97,11 @@
   (cond ((= x 0) 200)
         ((or (= x 8)
              (and (>= x 5) (>= y 3) (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
-        ((= y 0) (exp (/ x 4)))
+        ((= y 0) 50)
         ((= y 6) 100)
         (else #f)))
 
-(define (initial x y) (* 10 (sin (* x y))))
+(define (initial x y) 0)
 
 (define (run [hx 0.25] [hy 0.25] [dt 25] [conductivity 1])
   (let ((grid (make-grid 8 6 hx hy in-body? boundary initial)))
