@@ -33,7 +33,7 @@
                                     ((= (abs (- k n)) 1)
                                      (- r))
                                     (else 0)))))
-           (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 2)) time-step)))
+           (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 1)) time-step)))
                           (vector-append (vector (* r left-value))
                                          (make-vector (- eq-count 2) 0)
                                          (vector (* r right-value))))))
@@ -61,13 +61,14 @@
                     (let ((x (* j hx))
                           (y (* i hy)))
                       (if (body-predicate? x y eps)
-                          (make-grid-point x y i j
+                          (make-grid-point x y
                                            (boundary x y eps)
                                            (initial x y))
                           #f))))))
 
 ;; Set `value` field of point structure in grid to `new-point-value`
 (define (grid-value-update! grid i j new-point-value)
+  ;(display (format "~a → ~a" (grid-point-value (matrix-ref grid i j)) new-point-value))
   (matrix-set! grid i j
                (struct-copy grid-point
                             (matrix-ref grid i j)
@@ -98,54 +99,70 @@
         ((or (= x 8)
              (and (>= x 5) (>= y 3) (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
         ((= y 0) 50)
-        ((= y 6) 100)
+        ((= y 6) 50)
         (else #f)))
 
 (define (initial x y) 0)
 
-(define (run [hx 0.25] [hy 0.25] [dt 25] [conductivity 1])
-  (let ((grid (make-grid 8 6 hx hy in-body? boundary initial)))
-    (dump-grid-to-file grid "out-initial.txt")
-    ;; X
-    (for-each (lambda (i)
-                (let* ((row (build-vector (matrix-cols grid)
-                                          (lambda (j) (matrix-ref grid i j))))
-                       (left-i (vector-skip not row))
-                       (right-i (vector-skip-right not row))
-                       (left-point (vector-ref row left-i))
-                       (right-point (vector-ref row right-i)))
-                  (let ((solution
-                         (solve-heat conductivity
-                                     (lambda (k) (grid-point-value
-                                             (matrix-ref grid i (- k (add1 left-i)))))
-                                     (grid-point-bound left-point)
-                                     (grid-point-bound right-point)
-                                     (/ dt 2) hx
-                                     (- (grid-point-x right-point)
-                                        (grid-point-x left-point)))))
-                    (vector-for-each
-                     (lambda (j x) (grid-value-update! grid i j x))
-                     solution))))
-              (iota (matrix-rows grid)))
-    ;; Y
-    (for-each (lambda (i)
-                (let* ((row (build-vector (matrix-rows grid)
-                                          (lambda (j) (matrix-ref grid j i))))
-                       (left-i (vector-skip not row))
-                       (right-i (vector-skip-right not row))
-                       (left-point (vector-ref row left-i))
-                       (right-point (vector-ref row right-i)))
-                  (let ((solution
-                         (solve-heat conductivity
-                                     (lambda (k) (grid-point-value
-                                             (matrix-ref grid (- k (add1 left-i)) i)))
-                                     (grid-point-bound left-point)
-                                     (grid-point-bound right-point)
-                                     (/ dt 2) hy
-                                     (- (grid-point-y right-point)
-                                        (grid-point-y left-point)))))
-                    (vector-for-each
-                     (lambda (j x) (grid-value-update! grid j i x))
-                     solution))))
-              (iota (matrix-cols grid)))
-    (dump-grid-to-file grid "out.txt")))
+;; Solve 2D heat problem
+(define (solve-2d-heat grid [hx 0.25] [hy 0.25] [dt 25] [conductivity 1])
+  (dump-grid-to-file grid "out-initial.txt")
+  ;; X
+  (for-each (lambda (i)
+              (let* ((row (build-vector (matrix-cols grid)
+                                        (lambda (j) (matrix-ref grid i j))))
+                     (left-i (vector-skip not row))
+                     (right-i (vector-skip-right not row))
+                     (left-point (vector-ref row left-i))
+                     (right-point (vector-ref row right-i)))
+                (let ((solution
+                       (solve-heat (* 2 conductivity)
+                                   (lambda (k) (grid-point-value
+                                           (matrix-ref grid i (+ k left-i))))
+                                   (grid-point-bound left-point)
+                                   (grid-point-bound right-point)
+                                   dt hx
+                                   (- (grid-point-x right-point)
+                                      (grid-point-x left-point)))))
+                  (vector-for-each
+                   (lambda (j x) (grid-value-update! grid i (+ j left-i) x))
+                   solution))))
+            (iota (matrix-rows grid)))
+  (dump-grid-to-file grid "out-x.txt")
+  ;; Y
+  (for-each (lambda (i)
+              (let* ((row (build-vector (matrix-rows grid)
+                                        (lambda (j) (matrix-ref grid j i))))
+                     (left-i (vector-skip not row))
+                     (right-i (vector-skip-right not row))
+                     (left-point (vector-ref row left-i))
+                     (right-point (vector-ref row right-i)))
+                (let ((solution
+                       (solve-heat (* 2 conductivity)
+                                   (lambda (k) (grid-point-value
+                                           (matrix-ref grid (+ k left-i) i)))
+                                   (grid-point-bound left-point)
+                                   (grid-point-bound right-point)
+                                   dt hy
+                                   (- (grid-point-y right-point)
+                                      (grid-point-y left-point)))))
+                  (vector-for-each
+                   (lambda (j x) (grid-value-update! grid (+ j left-i) i x))
+                   solution))))
+            (iota (matrix-cols grid)))
+  (dump-grid-to-file grid "out.txt")
+  grid)
+
+(define (run grid hx hy time-step until-time)
+  (define (iteration initial-grid at-time)
+    (if (< at-time until-time)
+        (iteration (solve-2d-heat initial-grid hx hy time-step) (+ at-time time-step))
+        at-time))
+  (iteration grid 0))
+
+(let ([hx 0.05]
+      [hy 1]
+      [dt 0.5]
+      [until 5])
+  (run (make-grid 8 6 hx hy in-body? boundary initial)
+       hx hy dt until))
