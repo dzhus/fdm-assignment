@@ -74,10 +74,6 @@
         ;; `solution` vector contains node values of inner points
         (vector-append (vector (cond
                                 (left-balance
-                                 (display first-solution-point)
-                                 (newline)
-                                 (display (+ (* left-balance space-step) 1))
-                                 (newline)
                                  (/ first-solution-point
                                     (+ (* left-balance space-step) 1)))
                                 (left-flow
