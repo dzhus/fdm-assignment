@@ -46,7 +46,7 @@
                                          (vector (* r right-value))))))
       (let ((solution (solve-tridiagonal A v)))
       (vector-append (vector (if left-flow
-                                 (- (vector-ref solution 1) (* space-step left-flow))
+                                 (- (vector-ref solution 0) (* space-step left-flow))
                                  left-value))
                      solution
                      (vector right-value))))))
@@ -122,7 +122,7 @@
 
 ;; Solve 2D heat problem
 (define (solve-2d-heat grid hx hy dt [conductivity 1])
-  ;; X
+    ;; X
   (for-each (lambda (i)
               (let* ((row (build-vector (matrix-cols grid)
                                         (lambda (j) (matrix-ref grid i j))))
