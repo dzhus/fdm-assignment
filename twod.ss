@@ -145,7 +145,7 @@
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid i (+ j left-i) x))
                    solution))))
-            (iota (matrix-rows grid)))
+            (iota (- (matrix-rows grid) 2) 1))
   ;; Y
   (for-each (lambda (i)
               (let* ((row (build-vector (matrix-rows grid)
@@ -168,7 +168,7 @@
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid (+ j left-i) i x))
                    solution))))
-            (iota (matrix-cols grid)))
+            (iota (- (matrix-cols grid) 2) 1))
   grid)
 
 (define (run grid hx hy time-step until-time dump-file-name)
