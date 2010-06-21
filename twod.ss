@@ -34,22 +34,29 @@
                             (lambda (k n)
                               (cond ((= k n)
                                      (+ (/ time-step)
-                                        (* (if (and left-flow (= k 0)) 1 2) r)))
+                                        (* (if (or (and left-flow (= k 0))
+                                                   (and right-flow (= k (sub1 eq-count))))
+                                               1
+                                               2) r)))
                                     ((= (abs (- k n)) 1)
                                      (- r))
                                     (else 0)))))
-           (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 1)) time-step)))
+           (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 2)) time-step)))
                           (vector-append (vector (if left-flow
-                                                     (* r (- space-step) left-flow)
+                                                     (* r space-step (- left-flow))
                                                      (* r left-value)))
                                          (make-vector (- eq-count 2) 0)
-                                         (vector (* r right-value))))))
+                                         (vector (if right-flow
+                                                     (* r space-step (- right-flow))
+                                                     (* r right-value)))))))
       (let ((solution (solve-tridiagonal A v)))
       (vector-append (vector (if left-flow
                                  (- (vector-ref solution 0) (* space-step left-flow))
                                  left-value))
                      solution
-                     (vector right-value))))))
+                     (vector (if right-flow
+                                 (- (vector-ref solution (sub1 (vector-length solution))) (* space-step right-flow))
+                                 right-value)))))))
 
 (define-struct grid-point (x y bound value flow))
 
@@ -60,9 +67,10 @@
 ;; withing a bounding box with dimensions specified by `box-x` and
 ;; `box-y`. Points with coordinates which do not satisfy
 ;; `body-predicate?` are replaced with #f. For the rest points,
-;; `bound` and `initial` structure fields are set to the results of
-;; `boundary` and `initial` called with point coordinates,
-;; respectively.
+;; `bound`, `initial` and `flow` structure fields are set to the
+;; results of `boundary`, `initial` and `flow` arguments called with
+;; point coordinates, respectively. If `bound` result is non-nil, then
+;; initial is set to it instead.
 (define (make-grid box-x box-y hx hy body-predicate? boundary initial flow)
   (let ((eps (distance hx hy 0 0)))
     (build-matrix (add1 (inexact->exact (floor (/ box-y hy))))
