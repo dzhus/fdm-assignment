@@ -15,16 +15,23 @@
 
 ;; Calculate next layer for solution of heat equation
 ;;
-;; left-value and right-value are boundary values
+;; `left-value` and `right-value` are right and left values of 1-st kind
+;; boundary solution
 ;;
-;; initial is a function which return initial value in k-th node,
+;; `left-flow` and `right-flow` are derivative values of 2-nd kind
+;; boundary solution
+;;
+;; Priority: balance, flow, values.
+;;
+;; `initial` is a function which returns initial value in k-th node,
 ;; where k is 0-based
 (define (solve-heat conductivity
                     initial
                     left-value right-value
                     time-step space-step
                     [layer-length 1]
-                    [left-flow #f] [right-flow #f])
+                    [left-flow #f] [right-flow #f]
+                    [left-balance #f] [right-balance #f])
   ;; We need equations for k from 2 to K-2
   (let ((space-intervals (inexact->exact (round (/ layer-length space-step)))))
     ;; k is 1-based
@@ -34,33 +41,60 @@
                             (lambda (k n)
                               (cond ((= k n)
                                      (+ (/ time-step)
-                                        (* (if (or (and left-flow (= k 0))
-                                                   (and right-flow (= k (sub1 eq-count))))
-                                               1
-                                               2) r)))
+                                        (* (cond
+                                            ((and left-balance (= k 0))
+                                             (- 2 (/ (+ (* left-balance space-step) 1))))
+                                            ((and right-balance (= k (sub1 eq-count)))
+                                             (- 2 (/ (+ (* right-balance space-step) 1))))
+                                            ((or (and left-flow (= k 0))
+                                                 (and right-flow (= k (sub1 eq-count))))
+                                             1)
+                                            (else 2))
+                                            
+                                           r)))
                                     ((= (abs (- k n)) 1)
                                      (- r))
                                     (else 0)))))
            (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 2)) time-step)))
-                          (vector-append (vector (if left-flow
-                                                     (* r space-step left-flow)
-                                                     (* r left-value)))
+                          (vector-append (vector (cond
+                                                  (left-balance 0)
+                                                  (left-flow
+                                                   (* r space-step left-flow))
+                                                  (else
+                                                   (* r left-value))))
                                          (make-vector (- eq-count 2) 0)
-                                         (vector (if right-flow
-                                                     (* r space-step right-flow)
-                                                     (* r right-value)))))))
-      (let ((solution (solve-tridiagonal A v)))
-        (vector-append (vector (if left-flow
-                                   (- (vector-ref solution 0)
-                                      (* space-step (- left-flow)))
-                                   left-value))
+                                         (vector (cond
+                                                  (right-balance 0)
+                                                  (right-flow
+                                                   (* r space-step right-flow))
+                                                  (else (* r right-value))))))))
+      (let* ((solution (solve-tridiagonal A v))
+             (first-solution-point (vector-ref solution 0))
+             (last-solution-point (vector-ref solution (sub1 (vector-length solution)))))
+        ;; `solution` vector contains node values of inner points
+        (vector-append (vector (cond
+                                (left-balance
+                                 (display first-solution-point)
+                                 (newline)
+                                 (display (+ (* left-balance space-step) 1))
+                                 (newline)
+                                 (/ first-solution-point
+                                    (+ (* left-balance space-step) 1)))
+                                (left-flow
+                                 (- first-solution-point
+                                    (* space-step (- left-flow))))
+                                (else left-value)))
                        solution
-                       (vector (if right-flow
-                                   (- (vector-ref solution (sub1 (vector-length solution)))
-                                      (* space-step (- right-flow)))
-                                   right-value)))))))
+                       (vector (cond
+                                (right-balance
+                                 (/ last-solution-point
+                                    (+ (* right-balance space-step) 1)))
+                                (right-flow
+                                 (- last-solution-point
+                                    (* space-step (- right-flow))))
+                                (else right-value))))))))
 
-(define-struct grid-point (x y bound value flow))
+(define-struct grid-point (x y bound value flow balance))
 
 (define (distance x1 y1 x2 y2)
   (sqrt (+ (sqr (- x1 x2) ) (sqr (- y1 y2)))))
@@ -73,7 +107,7 @@
 ;; results of `boundary`, `initial` and `flow` arguments called with
 ;; point coordinates, respectively. If `bound` result is non-nil, then
 ;; initial is set to it instead.
-(define (make-grid box-x box-y hx hy body-predicate? boundary initial flow)
+(define (make-grid box-x box-y hx hy body-predicate? boundary initial flow balance)
   (let ((eps (distance hx hy 0 0)))
     (build-matrix (add1 (inexact->exact (floor (/ box-y hy))))
                   (add1 (inexact->exact (floor (/ box-x hx))))
@@ -85,7 +119,8 @@
                             (make-grid-point x y
                                              bound
                                              (if bound bound (initial x y))
-                                             (flow x y)))
+                                             (flow x y)
+                                             (balance x y)))
                           #f))))))
 
 ;; Set `value` field of point structure in grid to `new-point-value`
@@ -131,7 +166,9 @@
                                    (- (grid-point-x right-point)
                                       (grid-point-x left-point))
                                    (grid-point-flow left-point)
-                                   (grid-point-flow right-point))))
+                                   (grid-point-flow right-point)
+                                   (grid-point-balance left-point)
+                                   (grid-point-balance right-point))))
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid i (+ j left-i) x))
                    solution))))
@@ -154,7 +191,9 @@
                                    (- (grid-point-y right-point)
                                       (grid-point-y left-point))
                                    (grid-point-flow left-point)
-                                   (grid-point-flow right-point))))
+                                   (grid-point-flow right-point)
+                                   (grid-point-balance left-point)
+                                   (grid-point-balance right-point))))
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid (+ j left-i) i x))
                    solution))))
@@ -186,6 +225,10 @@
   (cond ((= y 6) 0)
         ((and (= y 0) (= x 4)) 500)
         (else #f)))
+
+(define (balance x y)
+  (cond
+   (else #f)))
 
 (define (initial x y) 0)
 
