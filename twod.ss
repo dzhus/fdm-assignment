@@ -43,19 +43,19 @@
                                     (else 0)))))
            (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 2)) time-step)))
                           (vector-append (vector (if left-flow
-                                                     (* r space-step (- left-flow))
+                                                     (* r space-step left-flow)
                                                      (* r left-value)))
                                          (make-vector (- eq-count 2) 0)
                                          (vector (if right-flow
-                                                     (* r space-step (- right-flow))
+                                                     (* r space-step right-flow)
                                                      (* r right-value)))))))
       (let ((solution (solve-tridiagonal A v)))
       (vector-append (vector (if left-flow
-                                 (- (vector-ref solution 0) (* space-step left-flow))
+                                 (- (vector-ref solution 0) (* space-step (- left-flow)))
                                  left-value))
                      solution
                      (vector (if right-flow
-                                 (- (vector-ref solution (sub1 (vector-length solution))) (* space-step right-flow))
+                                 (- (vector-ref solution (sub1 (vector-length solution))) (* space-step (- right-flow)))
                                  right-value)))))))
 
 (define-struct grid-point (x y bound value flow))
@@ -123,7 +123,7 @@
         (else #f)))
 
 (define (flow x y)
-  (cond ((and (= y 0) (= x 4)) -500)
+  (cond ((and (= y 0) (= x 4)) 500)
         (else #f)))
 
 (define (initial x y) 0)
