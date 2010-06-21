@@ -119,11 +119,11 @@
         ((or (= x 8)
              (and (>= x 5) (>= y 3) (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
         ((= y 0) 50)
-        ((= y 6) 100)
         (else #f)))
 
 (define (flow x y)
-  (cond ((and (= y 0) (= x 4)) 500)
+  (cond ((= y 6) 0)
+        ((and (= y 0) (= x 4)) 500)
         (else #f)))
 
 (define (initial x y) 0)
