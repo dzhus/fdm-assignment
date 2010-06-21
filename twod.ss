@@ -3,6 +3,8 @@
 (require srfi/1
          srfi/43
          srfi/48
+         ;; Windows:
+         ;;simple-matrix/matrix
          (planet wmfarr/simple-matrix:1:0/matrix)
          pyani-lib/matrix
          pyani-lib/linear-eq)
@@ -15,12 +17,14 @@
 ;;
 ;; left-value and right-value are boundary values
 ;;
-;; initial is a vector of initial values in nodes
+;; initial is a function which return initial value in k-th node,
+;; where k is 0-based
 (define (solve-heat conductivity
                     initial
                     left-value right-value
                     time-step space-step
-                    [layer-length 1])
+                    [layer-length 1]
+                    [left-flow #f] [right-flow #f])
   ;; We need equations for k from 2 to K-2
   (let ((space-intervals (inexact->exact (round (/ layer-length space-step)))))
     ;; k is 1-based
@@ -29,19 +33,25 @@
            (A (build-matrix eq-count eq-count
                             (lambda (k n)
                               (cond ((= k n)
-                                     (+ (/ time-step) (* 2 r)))
+                                     (+ (/ time-step)
+                                        (* (if (and left-flow (= k 0)) 1 2) r)))
                                     ((= (abs (- k n)) 1)
                                      (- r))
                                     (else 0)))))
            (v (vector-map (lambda (k x) (+ x (/ (initial (+ k 1)) time-step)))
-                          (vector-append (vector (* r left-value))
+                          (vector-append (vector (if left-flow
+                                                     (* r (- space-step) left-flow)
+                                                     (* r left-value)))
                                          (make-vector (- eq-count 2) 0)
                                          (vector (* r right-value))))))
-      (vector-append (vector left-value)
-                     (solve-tridiagonal A v)
-                     (vector right-value)))))
+      (let ((solution (solve-tridiagonal A v)))
+      (vector-append (vector (if left-flow
+                                 (- (vector-ref solution 1) (* space-step left-flow))
+                                 left-value))
+                     solution
+                     (vector right-value))))))
 
-(define-struct grid-point (x y bound value))
+(define-struct grid-point (x y bound value flow))
 
 (define (distance x1 y1 x2 y2)
   (sqrt (+ (sqr (- x1 x2) ) (sqr (- y1 y2)))))
@@ -53,7 +63,7 @@
 ;; `bound` and `initial` structure fields are set to the results of
 ;; `boundary` and `initial` called with point coordinates,
 ;; respectively.
-(define (make-grid box-x box-y hx hy body-predicate? boundary initial)
+(define (make-grid box-x box-y hx hy body-predicate? boundary initial flow)
   (let ((eps (distance hx hy 0 0)))
     (build-matrix (add1 (inexact->exact (floor (/ box-y hy))))
                   (add1 (inexact->exact (floor (/ box-x hx))))
@@ -61,10 +71,12 @@
                     (let ((x (* j hx))
                           (y (* i hy)))
                       (if (body-predicate? x y eps)
-                          (make-grid-point x y
-                                           (boundary x y eps)
-                                           (initial x y))
-                          #f))))))
+                          (let ((bound (boundary x y eps)))
+                            (make-grid-point x y
+                                             bound
+                                             (if bound bound (initial x y))
+                                             (flow x y)))
+                            #f))))))
 
 ;; Set `value` field of point structure in grid to `new-point-value`
 (define (grid-value-update! grid i j new-point-value)
@@ -99,14 +111,17 @@
         ((or (= x 8)
              (and (>= x 5) (>= y 3) (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
         ((= y 0) 50)
-        ((= y 6) 50)
+        ((= y 6) 100)
+        (else #f)))
+
+(define (flow x y)
+  (cond ((and (= y 0) (= x 4)) -500)
         (else #f)))
 
 (define (initial x y) 0)
 
 ;; Solve 2D heat problem
-(define (solve-2d-heat grid [hx 0.25] [hy 0.25] [dt 25] [conductivity 1])
-  (dump-grid-to-file grid "out-initial.txt")
+(define (solve-2d-heat grid hx hy dt [conductivity 1])
   ;; X
   (for-each (lambda (i)
               (let* ((row (build-vector (matrix-cols grid)
@@ -116,19 +131,21 @@
                      (left-point (vector-ref row left-i))
                      (right-point (vector-ref row right-i)))
                 (let ((solution
-                       (solve-heat (* 2 conductivity)
+                       (solve-heat conductivity
                                    (lambda (k) (grid-point-value
-                                           (matrix-ref grid i (+ k left-i))))
+                                           ;; Initial function is 1-based
+                                           (matrix-ref grid i (sub1 (+ k left-i)))))
                                    (grid-point-bound left-point)
                                    (grid-point-bound right-point)
                                    dt hx
                                    (- (grid-point-x right-point)
-                                      (grid-point-x left-point)))))
+                                      (grid-point-x left-point))
+                                   (grid-point-flow left-point)
+                                   (grid-point-flow right-point))))
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid i (+ j left-i) x))
                    solution))))
             (iota (matrix-rows grid)))
-  (dump-grid-to-file grid "out-x.txt")
   ;; Y
   (for-each (lambda (i)
               (let* ((row (build-vector (matrix-rows grid)
@@ -138,31 +155,33 @@
                      (left-point (vector-ref row left-i))
                      (right-point (vector-ref row right-i)))
                 (let ((solution
-                       (solve-heat (* 2 conductivity)
+                       (solve-heat conductivity
                                    (lambda (k) (grid-point-value
-                                           (matrix-ref grid (+ k left-i) i)))
+                                           (matrix-ref grid (sub1 (+ k left-i)) i)))
                                    (grid-point-bound left-point)
                                    (grid-point-bound right-point)
                                    dt hy
                                    (- (grid-point-y right-point)
-                                      (grid-point-y left-point)))))
+                                      (grid-point-y left-point))
+                                   (grid-point-flow left-point)
+                                   (grid-point-flow right-point))))
                   (vector-for-each
                    (lambda (j x) (grid-value-update! grid (+ j left-i) i x))
                    solution))))
             (iota (matrix-cols grid)))
-  (dump-grid-to-file grid "out.txt")
   grid)
 
-(define (run grid hx hy time-step until-time)
-  (define (iteration initial-grid at-time)
+(define (run grid hx hy time-step until-time dump-file-name)
+  (define (solve initial-grid at-time)
     (if (< at-time until-time)
-        (iteration (solve-2d-heat initial-grid hx hy time-step) (+ at-time time-step))
-        at-time))
-  (iteration grid 0))
+        (solve (solve-2d-heat initial-grid hx hy time-step) (+ at-time time-step))
+        initial-grid))
+  (dump-grid-to-file (solve grid 0) dump-file-name))
 
-(let ([hx 0.05]
-      [hy 1]
-      [dt 0.5]
+(let ([hx 0.25]
+      [hy 0.25]
+      [dt 0.05]
       [until 5])
-  (run (make-grid 8 6 hx hy in-body? boundary initial)
-       hx hy dt until))
+  (run (make-grid 8 6 hx hy in-body? boundary initial flow)
+       hx hy dt until
+       "out-c.txt"))
