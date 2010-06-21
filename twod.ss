@@ -50,13 +50,15 @@
                                                      (* r space-step right-flow)
                                                      (* r right-value)))))))
       (let ((solution (solve-tridiagonal A v)))
-      (vector-append (vector (if left-flow
-                                 (- (vector-ref solution 0) (* space-step (- left-flow)))
-                                 left-value))
-                     solution
-                     (vector (if right-flow
-                                 (- (vector-ref solution (sub1 (vector-length solution))) (* space-step (- right-flow)))
-                                 right-value)))))))
+        (vector-append (vector (if left-flow
+                                   (- (vector-ref solution 0)
+                                      (* space-step (- left-flow)))
+                                   left-value))
+                       solution
+                       (vector (if right-flow
+                                   (- (vector-ref solution (sub1 (vector-length solution)))
+                                      (* space-step (- right-flow)))
+                                   right-value)))))))
 
 (define-struct grid-point (x y bound value flow))
 
@@ -84,11 +86,10 @@
                                              bound
                                              (if bound bound (initial x y))
                                              (flow x y)))
-                            #f))))))
+                          #f))))))
 
 ;; Set `value` field of point structure in grid to `new-point-value`
 (define (grid-value-update! grid i j new-point-value)
-  ;(display (format "~a → ~a" (grid-point-value (matrix-ref grid i j)) new-point-value))
   (matrix-set! grid i j
                (struct-copy grid-point
                             (matrix-ref grid i j)
@@ -117,7 +118,9 @@
 (define (boundary x y [eps 0.1])
   (cond ((= x 0) 200)
         ((or (= x 8)
-             (and (>= x 5) (>= y 3) (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
+             (and (>= x 5)
+                  (>= y 3)
+                  (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
         ((= y 0) 50)
         (else #f)))
 
@@ -130,7 +133,7 @@
 
 ;; Solve 2D heat problem
 (define (solve-2d-heat grid hx hy dt [conductivity 1])
-    ;; X
+  ;; X
   (for-each (lambda (i)
               (let* ((row (build-vector (matrix-cols grid)
                                         (lambda (j) (matrix-ref grid i j))))
