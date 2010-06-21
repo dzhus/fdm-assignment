@@ -232,6 +232,6 @@
       [hy 0.25]
       [dt 0.05]
       [until 5])
-  (run (make-grid 8 6 hx hy in-body? boundary initial flow)
+  (run (make-grid 8 6 hx hy in-body? boundary initial flow balance)
        hx hy dt until
        "out-c.txt"))
