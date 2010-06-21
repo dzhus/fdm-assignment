@@ -110,27 +110,6 @@
       (display-grid grid))
     #:exists 'replace))
 
-(define (in-body? x y [eps 0.1])
-  (or (and (<= y 6) (<= x 5))
-      (and (<= y 3) (<= x 8))
-      (<= (distance x y 5 3) 3)))
-
-(define (boundary x y [eps 0.1])
-  (cond ((= x 0) 200)
-        ((or (= x 8)
-             (and (>= x 5)
-                  (>= y 3)
-                  (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
-        ((= y 0) 50)
-        (else #f)))
-
-(define (flow x y)
-  (cond ((= y 6) 0)
-        ((and (= y 0) (= x 4)) 500)
-        (else #f)))
-
-(define (initial x y) 0)
-
 ;; Solve 2D heat problem
 (define (solve-2d-heat grid hx hy dt [conductivity 1])
   ;; X
@@ -188,6 +167,27 @@
         (solve (solve-2d-heat initial-grid hx hy time-step) (+ at-time time-step))
         initial-grid))
   (dump-grid-to-file (solve grid 0) dump-file-name))
+
+(define (in-body? x y [eps 0.1])
+  (or (and (<= y 6) (<= x 5))
+      (and (<= y 3) (<= x 8))
+      (<= (distance x y 5 3) 3)))
+
+(define (boundary x y [eps 0.1])
+  (cond ((= x 0) 200)
+        ((or (= x 8)
+             (and (>= x 5)
+                  (>= y 3)
+                  (<= (abs (- (distance x y 5 3) 3)) eps))) 100)
+        ((= y 0) 50)
+        (else #f)))
+
+(define (flow x y)
+  (cond ((= y 6) 0)
+        ((and (= y 0) (= x 4)) 500)
+        (else #f)))
+
+(define (initial x y) 0)
 
 (let ([hx 0.25]
       [hy 0.25]
